@@ -9,6 +9,6 @@ setup(name='vzaar',
         keywords=['vzaar', 'video'],
         author="James Burkhart",
         author_email="pyvzaar@jamesburkhart.com",
-        url="https://github.com/fourk/vzaar",
+        url="https://github.com/inclingltd/vzaar",
         version='1.0.7',
         py_modules=['vzaar'])
