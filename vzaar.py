@@ -57,7 +57,7 @@ class dict2xml(object):
             father.appendChild(tag)
 
     def display(self):
-        print self.doc.toprettyxml(indent="  ")
+        print(self.doc.toprettyxml(indent="  "))
 
 class Vzaar(object):
     def __init__(self, vzaar_username, vzaar_key, video_success_redirect,
