@@ -6,6 +6,7 @@ import urllib
 import json
 import time
 import httplib2
+from urllib.parse import urlparse
 from xml.dom.minidom import parseString, Document
 
 """
@@ -29,7 +30,7 @@ class dict2xml(object):
 
     def __init__(self, structure):
         if len(structure) == 1:
-            rootName = str(structure.keys()[0])
+            rootName = str(list(structure.keys())[0])
             self.root = self.doc.createElement(rootName)
 
             self.doc.appendChild(self.root)
@@ -90,22 +91,15 @@ class Vzaar(object):
         params = {
                 'oauth_version': '1.0',
                 'oauth_nonce': oauth.generate_nonce(),
-                'oauth_timestamp': int(time.time()),
+                'oauth_timestamp': str(time.time()),
             }
         if extra_params is not None:
             params.update(extra_params)
         return params
 
     def _get_realm_from_uri(self, uri):
-        schema, rest = urllib.splittype(uri)
-        if rest.startswith('//'):
-            hierpart = '//'
-        else:
-            hierpart = ''
-        host, rest = urllib.splithost(rest)
-        realm = schema + ':' + hierpart + host
-
-        return realm
+        parsed_url = urlparse(uri)
+        return parsed_url.scheme+'://'+parsed_url.netloc
 
     def _make_call(self, endpoint, method='GET', extra_params=None,
             extra_headers=None, post_data=None):
@@ -150,7 +144,7 @@ class Vzaar(object):
     def _assert_status(self, response, body, status='200'):
         """Checks if the expected status code was returned - raises exception
         if not."""
-        if response.get('status') != '200':
+        if response.get('status') != status:
             raise Exception('Error - %s \n--\n %s' % (response, body))
 
     def account_details(self, account):
