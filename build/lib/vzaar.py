@@ -183,7 +183,7 @@ class Vzaar(object):
                 extra_params=kwargs)
         self._assert_status(response, body)
 
-        return json.loads(body)
+        return json.loads(body.decode('utf-8'))
 
 
     def video_list(self, username, **kwargs):
