@@ -1,4 +1,4 @@
-__version__ = '1.0.7'
+__version__ = '1.0.0'
 __author__ = "James Burkhart"
 
 import oauth2 as oauth
@@ -6,6 +6,7 @@ import urllib
 import json
 import time
 import httplib2
+from urllib.parse import urlparse
 from xml.dom.minidom import parseString, Document
 
 """
@@ -13,7 +14,7 @@ The Vzaar object expects to be instantiated with the following positional argume
     vzaar_username - string - your username (not your email)
     vzaar_key - string - Vzaar API key
     video_success_redirect - string - where to redirect a user after upload
-            ex: http://example.com/callback/ (or a callable that returns a string)
+            ex: http://example.com/callback/
     max_video_size - integer - size (in bytes) of maximum alowed upload size
 
     If you're using django, simply set a value for each of the above keys in
@@ -29,7 +30,7 @@ class dict2xml(object):
 
     def __init__(self, structure):
         if len(structure) == 1:
-            rootName = str(structure.keys()[0])
+            rootName = str(list(structure.keys())[0])
             self.root = self.doc.createElement(rootName)
 
             self.doc.appendChild(self.root)
@@ -64,8 +65,6 @@ class Vzaar(object):
             max_video_size):
 
         self.VIDEO_SUCCESS_REDIRECT = video_success_redirect
-        if hasattr(self.VIDEO_SUCCESS_REDIRECT, '__call__'):
-            self.VIDEO_SUCCESS_REDIRECT = self.VIDEO_SUCCESS_REDIRECT()
         self.MAX_VIDEO_SIZE = max_video_size
         self.token = oauth.Token(key=vzaar_username,
                 secret=vzaar_key)
@@ -92,22 +91,15 @@ class Vzaar(object):
         params = {
                 'oauth_version': '1.0',
                 'oauth_nonce': oauth.generate_nonce(),
-                'oauth_timestamp': int(time.time()),
+                'oauth_timestamp': str(time.time()),
             }
         if extra_params is not None:
             params.update(extra_params)
         return params
 
     def _get_realm_from_uri(self, uri):
-        schema, rest = urllib.splittype(uri)
-        if rest.startswith('//'):
-            hierpart = '//'
-        else:
-            hierpart = ''
-        host, rest = urllib.splithost(rest)
-        realm = schema + ':' + hierpart + host
-
-        return realm
+        parsed_url = urlparse(uri)
+        return parsed_url.scheme+'://'+parsed_url.netloc
 
     def _make_call(self, endpoint, method='GET', extra_params=None,
             extra_headers=None, post_data=None):
@@ -153,10 +145,7 @@ class Vzaar(object):
         """Checks if the expected status code was returned - raises exception
         if not."""
         if response.get('status') != status:
-            raise Exception(('Unexpected status. Expected %s -'
-                    'Got %s \n %s \n--\n %s') % (
-                        response.get('status'), status, response, body)
-                    )
+            raise Exception('Error - %s \n--\n %s' % (response, body))
 
     def account_details(self, account):
         """
@@ -194,7 +183,7 @@ class Vzaar(object):
                 extra_params=kwargs)
         self._assert_status(response, body)
 
-        return json.loads(body)
+        return json.loads(body.decode('utf-8'))
 
 
     def video_list(self, username, **kwargs):
@@ -320,4 +309,3 @@ class DjangoVzaar(Vzaar):
         super(DjangoVzaar, self).__init__(settings.VZAAR_USERNAME,
                 settings.VZAAR_KEY, settings.VIDEO_SUCCESS_REDIRECT,
                 settings.MAX_VIDEO_SIZE)
-
