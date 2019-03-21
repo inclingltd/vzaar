@@ -61,16 +61,18 @@ class dict2xml(object):
         print(self.doc.toprettyxml(indent="  "))
 
 class Vzaar(object):
-    def __init__(self, vzaar_username, vzaar_key, video_success_redirect,
+    def __init__(self, vzaar_client_id, vzaar_client_token, video_success_redirect,
             max_video_size):
 
         self.VIDEO_SUCCESS_REDIRECT = video_success_redirect
         self.MAX_VIDEO_SIZE = max_video_size
-        self.token = oauth.Token(key=vzaar_username,
-                secret=vzaar_key)
-        self.consumer = oauth.Consumer(key='', secret='')
-        self.base_url = 'http://vzaar.com/api/%s'
-        self.http_client = httplib2.Http()
+        # self.token = oauth.Token(key=vzaar_username,
+        #         secret=vzaar_key)
+        # self.consumer = oauth.Consumer(key='', secret='')
+        self.base_url = 'https://api.vzaar.com/api/v2/%s'
+        self.http_client = httplib2.Http(disable_ssl_certificate_validation=True)
+        self.vzaar_client_id = vzaar_client_id
+        self.vzaar_client_token = vzaar_client_token
 
     def _prepare_request(self, method, uri, parameters):
         req = oauth.Request(method=method, url=uri, parameters=parameters)
@@ -88,11 +90,13 @@ class Vzaar(object):
         return xml
 
     def _prepare_parameters(self, extra_params):
-        params = {
-                'oauth_version': '1.0',
-                'oauth_nonce': oauth.generate_nonce(),
-                'oauth_timestamp': str(time.time()),
-            }
+        # params = {
+        #         'oauth_version': '1.0',
+        #         'oauth_nonce': oauth.generate_nonce(),
+        #         'oauth_timestamp': str(time.time()),
+        #     }
+
+        params = {}
         if extra_params is not None:
             params.update(extra_params)
         return params
@@ -103,26 +107,26 @@ class Vzaar(object):
 
     def _make_call(self, endpoint, method='GET', extra_params=None,
             extra_headers=None, post_data=None):
-        headers = {}
+        headers = {
+            'X-Client-Id': self.vzaar_client_id,
+            'X-Auth-Token': self.vzaar_client_token
+        }
         if extra_headers is not None:
             headers.update(extra_headers)
 
         params = self._prepare_parameters(extra_params)
 
         uri = self.base_url % endpoint
-        req = self._prepare_request(method, uri, params)
+        #req = self._prepare_request(method, uri, params)
 
         if method in ['GET', 'DELETE']:
-            uri = req.to_url()
+            uri = uri
             body = ''
         else:
-            headers['Content-Type'] = 'application/xml'
-            realm = self._get_realm_from_uri(uri)
-            headers.update(req.to_header(realm=realm))
-            body = self._prepare_post_data(post_data)
+            headers['Content-Type'] = 'application/json'
+            body = json.dumps(post_data)
 
-        return httplib2.Http.request(self.http_client, uri, method=method,
-                    body=body, headers=headers)
+        return self.http_client.request(uri, method=method, body=body, headers=headers)
 
     def _parse_xml(self, body, keys):
         """
@@ -179,11 +183,11 @@ class Vzaar(object):
                             embedding in it
         http://developer.vzaar.com/docs/version_1.0/public/video_details
         """
-        response, body = self._make_call('videos/%s.json' % id,
+        response, body = self._make_call('videos/%s' % id,
                 extra_params=kwargs)
         self._assert_status(response, body)
 
-        return json.loads(body.decode('utf-8'))
+        return json.loads(body.decode('utf-8'))['data']
 
 
     def video_list(self, username, **kwargs):
@@ -202,27 +206,21 @@ class Vzaar(object):
         title, string - Return only videos with title containing given string
         """
 
-        response, body = self._make_call('%s/videos.json' % username,
-                extra_params=kwargs)
+        response, body = self._make_call('videos', extra_params=kwargs)
         self._assert_status(response, body)
         return json.loads(body)
 
 
     def prepare_upload(self):
         extra_params = {
-                'success_action_redirect': self.VIDEO_SUCCESS_REDIRECT,
-                'max_file_size': self.MAX_VIDEO_SIZE,
-                }
-        response, body = self._make_call('videos/signature',
-                extra_params=extra_params)
-        self._assert_status(response, body)
+            'uploader': 'Python 3.6'
+        }
+        response, body = self._make_call(
+            'signature/single/2', post_data=extra_params, method='POST')
 
-        keys = ['guid', 'key', 'https', 'acl', 'bucket',
-                'policy', 'expirationdate', 'accesskeyid', 'signature']
-        data_out = self._parse_xml(body, keys)
-        data_out['success_action_redirect'] = extra_params['success_action_redirect']
+        self._assert_status(response, body, status='201')
 
-        return data_out
+        return json.loads(body)['data']
 
 
     def process(self, guid, **kwargs):
@@ -252,18 +250,17 @@ class Vzaar(object):
         5. Original
         """
         body_data = {
-                'guid': guid,
-                'title': 'Untitled',
-                'description': 'No description',
+            'guid': guid,
+            'title': 'Untitled',
+            'description': 'No description',
         }
         body_data.update(kwargs)
-        post_data = {'video': body_data}
 
         response, body = self._make_call('videos', method="POST",
-                post_data=post_data)
-        self._assert_status(response, body, '201')
+                post_data=body_data)
+        self._assert_status(response, body, status='201')
 
-        return self._parse_xml(body, ['video'])
+        return json.loads(body)['data']['id']
 
 
     def delete(self, id):
@@ -271,13 +268,11 @@ class Vzaar(object):
         REQUIRED:
         id - ex: 912345
         """
-        response, body = self._make_call('videos/%s.xml' % id,
+        response, body = self._make_call('videos/%s' % id,
                 method="DELETE")
         self._assert_status(response, body)
 
-        keys = ['type', 'version', 'title', 'author_name', 'author_url',
-                'provider_name', 'provider_url', 'html', 'height', 'width']
-        return self._parse_xml(body, keys)
+        return body
 
 
     def edit(self, id, **kwargs):
@@ -300,12 +295,14 @@ class Vzaar(object):
         return self._parse_xml(body, keys)
         return response, body
 
+
 class DjangoVzaar(Vzaar):
     """
     wrapper for Vzaar api that takes settings from django config file
     """
     def __init__(self):
         from django.conf import settings
-        super(DjangoVzaar, self).__init__(settings.VZAAR_USERNAME,
-                settings.VZAAR_KEY, settings.VIDEO_SUCCESS_REDIRECT,
-                settings.MAX_VIDEO_SIZE)
+
+        super(DjangoVzaar, self).__init__(
+            settings.VZAAR_ClIENT_ID, settings.VZAAR_ClIENT_TOKEN, settings.VIDEO_SUCCESS_REDIRECT,
+            settings.MAX_VIDEO_SIZE)
