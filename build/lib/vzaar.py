@@ -304,5 +304,5 @@ class DjangoVzaar(Vzaar):
         from django.conf import settings
 
         super(DjangoVzaar, self).__init__(
-            settings.VZAAR_ClIENT_ID, settings.VZAAR_ClIENT_TOKEN, settings.VIDEO_SUCCESS_REDIRECT,
+            settings.VZAAR_CLIENT_ID, settings.VZAAR_CLIENT_TOKEN, settings.VIDEO_SUCCESS_REDIRECT,
             settings.MAX_VIDEO_SIZE)
