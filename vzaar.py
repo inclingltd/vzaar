@@ -2,9 +2,7 @@ __version__ = '1.0.0'
 __author__ = "James Burkhart"
 
 import oauth2 as oauth
-import urllib
 import json
-import time
 import httplib2
 from urllib.parse import urlparse
 from xml.dom.minidom import parseString, Document
@@ -21,6 +19,7 @@ The Vzaar object expects to be instantiated with the following positional argume
     your settings.py file (convert to uppercase, i.e. VZAAR_KEY) and import
     DjangoVzaar instead of Vzaar
 """
+
 
 class dict2xml(object):
     """
@@ -60,9 +59,9 @@ class dict2xml(object):
     def display(self):
         print(self.doc.toprettyxml(indent="  "))
 
+
 class Vzaar(object):
-    def __init__(self, vzaar_client_id, vzaar_client_token, video_success_redirect,
-            max_video_size):
+    def __init__(self, vzaar_client_id, vzaar_client_token, video_success_redirect, max_video_size):
 
         self.VIDEO_SUCCESS_REDIRECT = video_success_redirect
         self.MAX_VIDEO_SIZE = max_video_size
@@ -223,7 +222,7 @@ class Vzaar(object):
         return json.loads(body)['data']
 
 
-    def process(self, guid, **kwargs):
+    def process(self, guid, ingest_recipe_id=False, **kwargs):
         """
         REQUIRED:
         guid string - Specifies the guid to operate on
@@ -254,6 +253,10 @@ class Vzaar(object):
             'title': 'Untitled',
             'description': 'No description',
         }
+
+        if ingest_recipe_id:
+            body_data.update({'ingest_recipe_id': ingest_recipe_id})
+
         body_data.update(kwargs)
 
         response, body = self._make_call('videos', method="POST",
